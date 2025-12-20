@@ -2,41 +2,71 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Herstelde Interface</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Master Build — Matrix/Glass Interface</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="theme-glass">
   <header class="topbar">
-    <div class="brand">Herstelde Interface</div>
-    <button class="btn open-settings" aria-haspopup="dialog">⚙️ Instellingen</button>
+    <div class="brand">
+      <span class="logo-dot"></span>
+      <span class="brand-text">Master Build</span>
+      <span class="brand-sub">Matrix/Glass</span>
+    </div>
+    <div class="actions">
+      <button id="toggleTheme" class="icon-btn" title="Thema wisselen (Matrix/Glass)" aria-label="Thema wisselen">👁️‍🗨️</button>
+      <button id="clearChat" class="icon-btn" title="Prullenbak - Leeg chat" aria-label="Chat leegmaken">🗑️</button>
+      <button id="openSettings" class="icon-btn" title="Instellingen" aria-label="Instellingen">⚙️</button>
+    </div>
   </header>
 
-  <main class="content">
-    <h1>Interface actief</h1>
-    <p>Lichtgewicht, zonder onnodige initiële logica. Geen fetch bij opstarten.</p>
+  <main class="chat" id="app">
+    <div id="chatWindow" class="chat-window" aria-live="polite"></div>
+    <form id="composer" class="composer" autocomplete="off">
+      <textarea id="input" class="prompt" rows="1" placeholder="Typ een bericht... (Shift+Enter = nieuwe regel)" aria-label="Bericht invoer"></textarea>
+      <button id="sendBtn" class="send-btn" type="submit" title="Versturen">Versturen</button>
+    </form>
   </main>
 
-  <div id="settingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" style="display:none;">
-    <div class="modal-content">
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
       <div class="modal-header">
         <h2 id="settingsTitle">Instellingen</h2>
-        <button class="btn btn-ghost close-modal" aria-label="Sluiten">✖</button>
       </div>
       <div class="modal-body">
-        <label for="apiKeyInput">API Key</label>
-        <input id="apiKeyInput" type="text" placeholder="Voer je API Key in" autocomplete="off">
-
-        <label for="tokenInput">Token</label>
-        <input id="tokenInput" type="text" placeholder="Voer je Token in" autocomplete="off">
+        <div class="field">
+          <label for="apiKey">API Key</label>
+          <input type="password" id="apiKey" placeholder="Voer je API Key in" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="ghToken">GitHub Token</label>
+          <input type="password" id="ghToken" placeholder="Voer je GitHub Token in" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="modelSelect">Model</label>
+          <select id="modelSelect">
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-5">gpt-5</option>
+            <option value="custom">custom</option>
+          </select>
+        </div>
+        <div class="field" id="customModelWrap" style="display:none">
+          <label for="customModel">Custom Model</label>
+          <input type="text" id="customModel" placeholder="bijv. my-org/special-model" />
+        </div>
+        <div class="field">
+          <label for="systemInstructions">System Instructions</label>
+          <textarea id="systemInstructions" rows="8" placeholder="Schrijf hier je system prompt / rol / richtlijnen..."></textarea>
+        </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary btn-save">💾 OPSLAAN (Force)</button>
-        <button class="btn btn-danger btn-reset">⚠️ RESET ALLES</button>
+        <button id="saveSettingsBtn" class="primary">💾 Opslaan & Sluiten</button>
       </div>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
