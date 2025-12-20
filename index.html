@@ -1,49 +1,39 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Chat – Matrix Glass</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Herstelde Interface</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Aphex Chat</div>
-    <div class="actions">
-      <button id="openSettingsBtn" class="btn">Instellingen</button>
-    </div>
+    <div class="brand">Herstelde Interface</div>
+    <button class="btn open-settings" aria-haspopup="dialog">⚙️ Instellingen</button>
   </header>
 
-  <main class="container">
-    <section id="chat" class="chat">
-      <div id="messages" class="messages" aria-live="polite"></div>
-      <form id="composer" class="composer" autocomplete="off">
-        <input id="messageInput" type="text" placeholder="Typ een bericht..." />
-        <button id="sendBtn" class="btn primary" type="submit">Verstuur</button>
-      </form>
-    </section>
+  <main class="content">
+    <h1>Interface actief</h1>
+    <p>Lichtgewicht, zonder onnodige initiële logica. Geen fetch bij opstarten.</p>
   </main>
 
-  <!-- Settings Modal -->
-  <div id="settingsModal" class="modal" aria-hidden="true">
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <header class="modal-header">
-        <h2 id="modalTitle">Instellingen</h2>
-      </header>
-      <div class="modal-body">
-        <label for="openaiKey">OpenAI API Key</label>
-        <input id="openaiKey" type="password" placeholder="sk-..." />
-
-        <label for="githubToken">GitHub Token (optioneel)</label>
-        <input id="githubToken" type="password" placeholder="ghp_..." />
-
-        <p class="hint">Sla op om uw wijzigingen te bewaren. Er wordt geen verbinding getest bij opslaan.</p>
+  <div id="settingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="settingsTitle">Instellingen</h2>
+        <button class="btn btn-ghost close-modal" aria-label="Sluiten">✖</button>
       </div>
-      <footer class="modal-footer">
-        <button id="saveSettingsBtn" class="btn primary">💾 Opslaan &amp; Sluiten</button>
-        <button id="cancelSettingsBtn" class="btn">Annuleren</button>
-      </footer>
+      <div class="modal-body">
+        <label for="apiKeyInput">API Key</label>
+        <input id="apiKeyInput" type="text" placeholder="Voer je API Key in" autocomplete="off">
+
+        <label for="tokenInput">Token</label>
+        <input id="tokenInput" type="text" placeholder="Voer je Token in" autocomplete="off">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-save">💾 OPSLAAN (Force)</button>
+        <button class="btn btn-danger btn-reset">⚠️ RESET ALLES</button>
+      </div>
     </div>
   </div>
 
