@@ -1,226 +1,300 @@
 (function(){
+  // Keys for localStorage
+  const STORAGE = {
+    SETTINGS: 'mb_settings_v1',
+    CHAT: 'mb_chat_v1'
+  };
+
+  // State
+  let state = {
+    settings: {
+      openaiKey: '',
+      githubToken: '',
+      model: 'gpt-4o',
+      customModel: '',
+      systemInstructions: '',
+      theme: 'theme-glass'
+    },
+    chat: []
+  };
+
+  let currentController = null;
+
   // Elements
-  const body = document.body;
-  const switchBtn = document.getElementById('switchThemeBtn');
-  const settingsBtn = document.getElementById('settingsBtn');
-  const settingsModal = document.getElementById('settingsModal');
-  const saveKeysBtn = document.getElementById('saveKeysBtn');
-  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-  const openaiKeyInput = document.getElementById('openaiKeyInput');
-  const githubKeyInput = document.getElementById('githubKeyInput');
-  const chatForm = document.getElementById('chatForm');
-  const messageInput = document.getElementById('messageInput');
-  const messagesEl = document.getElementById('messages');
+  const el = {
+    chat: null,
+    userInput: null,
+    sendBtn: null,
+    stopBtn: null,
+    themeBtn: null,
+    clearBtn: null,
+    configBtn: null,
+    settingsModal: null,
+    openaiKey: null,
+    githubToken: null,
+    modelSelect: null,
+    customModelWrap: null,
+    customModel: null,
+    systemInstructions: null,
+    saveSettings: null,
+    closeSettings: null,
+    appTitle: null,
+    appStatus: null
+  };
 
-  // Chat history kept in-memory
-  const conversation = [];
-
-  // THEME HANDLING
-  function getStoredTheme(){
-    return localStorage.getItem('theme');
+  // Helpers
+  function $(id){ return document.getElementById(id); }
+  function saveState(){
+    localStorage.setItem(STORAGE.SETTINGS, JSON.stringify(state.settings));
+    localStorage.setItem(STORAGE.CHAT, JSON.stringify(state.chat));
   }
-  function applyTheme(theme){
-    if(theme === 'theme-glass'){
-      body.classList.remove('theme-matrix');
-      body.classList.add('theme-glass');
-    } else {
-      body.classList.remove('theme-glass');
-      body.classList.add('theme-matrix');
-    }
-    localStorage.setItem('theme', theme);
-  }
-  function toggleTheme(){
-    const isGlass = body.classList.contains('theme-glass');
-    applyTheme(isGlass ? 'theme-matrix' : 'theme-glass');
-  }
-
-  // INITIAL THEME SETUP
-  (function initTheme(){
-    const stored = getStoredTheme();
-    if(!stored){
-      // default to matrix
-      applyTheme('theme-matrix');
-    } else {
-      applyTheme(stored);
-    }
-  })();
-
-  switchBtn.addEventListener('click', ()=>{
-    toggleTheme();
-  });
-
-  // SETTINGS (API KEYS)
-  function openSettings(){
-    // populate with stored values (masked)
-    const openaiStored = localStorage.getItem('openaiKey') || '';
-    const githubStored = localStorage.getItem('githubKey') || '';
-    openaiKeyInput.value = openaiStored;
-    githubKeyInput.value = githubStored;
-    settingsModal.classList.remove('hidden');
-  }
-  function closeSettings(){
-    settingsModal.classList.add('hidden');
-  }
-
-  settingsBtn.addEventListener('click', openSettings);
-  closeSettingsBtn.addEventListener('click', closeSettings);
-
-  saveKeysBtn.addEventListener('click', ()=>{
-    const openaiVal = openaiKeyInput.value.trim();
-    const githubVal = githubKeyInput.value.trim();
-    if(openaiVal){
-      localStorage.setItem('openaiKey', openaiVal);
-    } else {
-      localStorage.removeItem('openaiKey');
-    }
-    if(githubVal){
-      localStorage.setItem('githubKey', githubVal);
-    } else {
-      localStorage.removeItem('githubKey');
-    }
-    closeSettings();
-  });
-
-  // If no keys, prompt user
-  (function ensureKeys(){
-    const key = localStorage.getItem('openaiKey');
-    if(!key){
-      // small delay to let UI render
-      setTimeout(openSettings, 300);
-    }
-  })();
-
-  // Utilities: create message element
-  function createMessageEl(text, role){
-    const el = document.createElement('div');
-    el.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
-    el.setAttribute('data-role', role);
-    return el;
-  }
-
-  // Typewriter effect for matrix mode
-  function typeWriter(text, container, speed = 18){
-    return new Promise((resolve)=>{
-      let i = 0;
-      const caret = document.createElement('span');
-      caret.className = 'type-caret';
-      container.appendChild(caret);
-      const interval = setInterval(()=>{
-        if(i < text.length){
-          // insert before caret
-          caret.insertAdjacentText('beforebegin', text.charAt(i));
-          i++;
-          messagesEl.scrollTop = messagesEl.scrollHeight;
-        } else {
-          clearInterval(interval);
-          caret.remove();
-          resolve();
-        }
-      }, speed);
-    });
-  }
-
-  // Display assistant text, considering theme
-  async function displayAssistantText(text){
-    const el = createMessageEl('', 'assistant');
-    messagesEl.appendChild(el);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    if(body.classList.contains('theme-matrix')){
-      // typewriter
-      await typeWriter(text, el, 14);
-    } else {
-      el.textContent = text;
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  }
-
-  // Send to OpenAI Chat Completion
-  async function sendToOpenAI(userMessage){
-    const key = localStorage.getItem('openaiKey');
-    if(!key){
-      openSettings();
-      return displayAssistantText('OpenAI API key ontbreekt. Open settings om de key toe te voegen.');
-    }
-
-    // show placeholder assistant message while waiting
-    const thinkingEl = createMessageEl('...', 'assistant');
-    messagesEl.appendChild(thinkingEl);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-
-    // build messages payload with recent conversation (simple)
-    const payloadMessages = [];
-    // optional system prompt for consistent behaviour
-    payloadMessages.push({role:'system', content:'Je bent een behulpzame assistent.'});
-    for(const m of conversation){
-      payloadMessages.push({role:m.role, content:m.content});
-    }
-    payloadMessages.push({role:'user', content:userMessage});
-
+  function loadState(){
     try{
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      const s = JSON.parse(localStorage.getItem(STORAGE.SETTINGS) || '{}');
+      state.settings = Object.assign(state.settings, s);
+    }catch(e){}
+    try{
+      const c = JSON.parse(localStorage.getItem(STORAGE.CHAT) || '[]');
+      state.chat = Array.isArray(c) ? c : [];
+    }catch(e){state.chat = []}
+  }
+
+  function escapeHtml(text){
+    return text
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
+  }
+
+  function renderChat(){
+    const container = el.chat;
+    if(!container) return;
+    const wasAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 120;
+    container.innerHTML = '';
+    state.chat.forEach(m => {
+      const msg = document.createElement('div');
+      msg.className = 'message ' + (m.role === 'user' ? 'user' : (m.role === 'assistant' ? 'assistant' : 'system'));
+      // Simple markdown codeblock handling: ``` blocks -> <pre>
+      let content = escapeHtml(m.content || '');
+      // convert triple backtick blocks
+      content = content.replace(/```([\s\S]*?)```/g, function(_, code){
+        return '<pre>' + escapeHtml(code) + '</pre>'; // pre will be safe
+      });
+      // convert single line breaks
+      content = content.replace(/\n/g, '<br>');
+      msg.innerHTML = content;
+      container.appendChild(msg);
+    });
+    if(wasAtBottom) container.scrollTop = container.scrollHeight;
+  }
+
+  function pushMessage(role, content){
+    const msg = {role, content: content || '', ts: Date.now()};
+    state.chat.push(msg);
+    saveState();
+    renderChat();
+  }
+
+  function applySettingsToUI(){
+    document.body.classList.remove('theme-glass','theme-matrix');
+    document.body.classList.add(state.settings.theme || 'theme-glass');
+    if(el.openaiKey) el.openaiKey.value = state.settings.openaiKey || '';
+    if(el.githubToken) el.githubToken.value = state.settings.githubToken || '';
+    if(el.modelSelect) el.modelSelect.value = state.settings.model || 'gpt-4o';
+    if(el.customModel) el.customModel.value = state.settings.customModel || '';
+    if(el.systemInstructions) el.systemInstructions.value = state.settings.systemInstructions || '';
+    toggleCustomField(state.settings.model === 'custom');
+  }
+
+  function toggleCustomField(show){
+    if(el.customModelWrap) el.customModelWrap.classList.toggle('hidden', !show);
+  }
+
+  function openModal(){ el.settingsModal.classList.remove('hidden'); }
+  function closeModal(){ el.settingsModal.classList.add('hidden'); }
+
+  async function sendToOpenAI(){
+    const key = state.settings.openaiKey;
+    if(!key){
+      alert('OpenAI API key ontbreekt — zet hem in Instellingen');
+      return;
+    }
+
+    // Build messages: include system instructions as first message
+    const system = (state.settings.systemInstructions || '').trim();
+    const apiMessages = [];
+    if(system) apiMessages.push({role: 'system', content: system});
+    // include full chat history (we only include user/assistant roles)
+    state.chat.forEach(m => {
+      if(m.role === 'system') return;
+      apiMessages.push({role: m.role, content: m.content});
+    });
+
+    const modelParam = (state.settings.model === 'custom' && state.settings.customModel) ? state.settings.customModel : state.settings.model;
+
+    // show status and stop btn
+    el.appStatus.textContent = '— Generating...';
+    el.stopBtn.classList.remove('hidden');
+
+    // create controller
+    currentController = new AbortController();
+    try{
+      const resp = await fetch('https://api.openai.com/v1/chat/completions',{
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + key
+          'Content-Type':'application/json',
+          'Authorization':'Bearer ' + key
         },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: payloadMessages,
-          max_tokens: 600,
-          temperature: 0.7
-        })
+        body: JSON.stringify({ model: modelParam, messages: apiMessages, max_tokens: 1500 }),
+        signal: currentController.signal
       });
 
       if(!resp.ok){
-        const errorText = await resp.text();
-        thinkingEl.remove();
-        return displayAssistantText('API fout: ' + resp.status + ' - ' + errorText);
+        const errText = await resp.text();
+        pushMessage('assistant','[Error] API returned ' + resp.status + '\n' + errText);
+        return;
       }
 
       const data = await resp.json();
-      const content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) ? data.choices[0].message.content.trim() : 'Geen antwoord ontvangen.';
+      const assistantMsg = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) ? data.choices[0].message.content : '[Geen antwoord]';
+      pushMessage('assistant', assistantMsg);
 
-      // update conversation
-      conversation.push({role:'user', content: userMessage});
-      conversation.push({role:'assistant', content: content});
-
-      // remove thinking placeholder
-      thinkingEl.remove();
-
-      await displayAssistantText(content);
-    } catch(err){
-      thinkingEl.remove();
-      displayAssistantText('Netwerkfout of CORS fout: ' + (err && err.message ? err.message : String(err)));
+    }catch(e){
+      if(e.name === 'AbortError'){
+        pushMessage('assistant','[Generatie gestopt door gebruiker]');
+      }else{
+        pushMessage('assistant','[Error] ' + (e.message || 'Onbekende fout'));
+      }
+    }finally{
+      currentController = null;
+      el.stopBtn.classList.add('hidden');
+      el.appStatus.textContent = '— Ready';
+      saveState();
     }
   }
 
-  // Chat form handler
-  chatForm.addEventListener('submit', (e)=>{
-    e.preventDefault();
-    const text = messageInput.value.trim();
+  // Public actions
+  function onSend(){
+    const text = (el.userInput.value || '').trim();
     if(!text) return;
-    // append user message
-    const userEl = createMessageEl(text, 'user');
-    userEl.textContent = text;
-    messagesEl.appendChild(userEl);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    pushMessage('user', text);
+    el.userInput.value = '';
+    adjustTextareaHeight();
+    // start the API call
+    sendToOpenAI();
+  }
 
-    messageInput.value = '';
-    // call OpenAI
-    sendToOpenAI(text);
-  });
-
-  // Allow pressing Escape to close settings modal
-  document.addEventListener('keydown', (e)=>{
-    if(e.key === 'Escape'){
-      if(!settingsModal.classList.contains('hidden')){
-        closeSettings();
-      }
+  function onStop(){
+    if(currentController){
+      currentController.abort();
     }
-  });
+    el.stopBtn.classList.add('hidden');
+  }
 
-  // expose minimal debug on window for dev usage
-  window.__hybridUI = {
-    applyTheme, toggleTheme, openSettings, closeSettings, conversation
-  };
+  function onClear(){
+    if(!confirm('Weet je het zeker? Alles wordt gewist.')) return;
+    state.chat = [];
+    saveState();
+    renderChat();
+  }
+
+  function cycleTheme(){
+    const t = state.settings.theme === 'theme-glass' ? 'theme-matrix' : 'theme-glass';
+    state.settings.theme = t;
+    applySettingsToUI();
+    saveState();
+  }
+
+  function adjustTextareaHeight(){
+    const ta = el.userInput;
+    if(!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(160, ta.scrollHeight) + 'px';
+  }
+
+  function init(){
+    // bind elements
+    el.chat = $('chat');
+    el.userInput = $('user-input');
+    el.sendBtn = $('send-btn');
+    el.stopBtn = $('stop-btn');
+    el.themeBtn = $('theme-btn');
+    el.clearBtn = $('clear-btn');
+    el.configBtn = $('config-btn');
+    el.settingsModal = $('settings-modal');
+    el.openaiKey = $('openai-key');
+    el.githubToken = $('github-token');
+    el.modelSelect = $('model-select');
+    el.customModelWrap = $('custom-model-wrap');
+    el.customModel = $('custom-model');
+    el.systemInstructions = $('system-instructions');
+    el.saveSettings = $('save-settings');
+    el.closeSettings = $('close-settings');
+    el.appTitle = $('app-title');
+    el.appStatus = $('app-status');
+
+    // load
+    loadState();
+    applySettingsToUI();
+    renderChat();
+
+    // events
+    el.sendBtn.addEventListener('click', onSend);
+    el.stopBtn.addEventListener('click', onStop);
+    el.themeBtn.addEventListener('click', cycleTheme);
+    el.clearBtn.addEventListener('click', onClear);
+    el.configBtn.addEventListener('click', openModal);
+    el.closeSettings.addEventListener('click', closeModal);
+
+    el.saveSettings.addEventListener('click', function(){
+      state.settings.openaiKey = el.openaiKey.value.trim();
+      state.settings.githubToken = el.githubToken.value.trim();
+      state.settings.model = el.modelSelect.value;
+      state.settings.customModel = el.customModel.value.trim();
+      state.settings.systemInstructions = el.systemInstructions.value;
+      state.settings.theme = document.body.classList.contains('theme-matrix') ? 'theme-matrix' : (state.settings.theme || 'theme-glass');
+      saveState();
+      applySettingsToUI();
+      closeModal();
+    });
+
+    el.modelSelect.addEventListener('change', function(){
+      toggleCustomField(el.modelSelect.value === 'custom');
+    });
+
+    // input keyboard
+    el.userInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        onSend();
+      }
+    });
+
+    el.userInput.addEventListener('input', function(){ adjustTextareaHeight(); });
+    window.addEventListener('resize', function(){ adjustTextareaHeight(); });
+
+    // scroll locking behavior: if user scrolls up, stop auto-scroll until they scroll back down near bottom
+    let userScrolledUp = false;
+    el.chat.addEventListener('scroll', function(){
+      const c = el.chat;
+      userScrolledUp = (c.scrollTop + c.clientHeight) < (c.scrollHeight - 120);
+    });
+
+    // override pushMessage to consider auto-scroll only if user not scrolled up
+    const originalPush = pushMessage;
+    pushMessage = function(role, content){
+      originalPush(role, content);
+      // after render, only auto scroll if user is not scrolled up
+      if(!userScrolledUp){ el.chat.scrollTop = el.chat.scrollHeight; }
+    };
+
+    // make sure everything has been applied
+    applySettingsToUI();
+    renderChat();
+  }
+
+  // start
+  document.addEventListener('DOMContentLoaded', init);
 })();
